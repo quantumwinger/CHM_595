@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Particle in a Box — Degeneracy Explorer</title>
+    <meta name="description"
+        content="Interactive 2D particle in a box simulation: explore wavefunctions, probability densities, and energy level degeneracy.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --card: #1a1d2e;
+            --card-border: #2a2d42;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 25% 25%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 75% 75%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
+            animation: drift 20s ease-in-out infinite alternate;
+            z-index: -1;
+        }
+
+        @keyframes drift {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            100% {
+                transform: translate(-3%, 2%) rotate(3deg);
+            }
+        }
+
+        header {
+            text-align: center;
+            padding: 2.2rem 1rem 0.8rem;
+        }
+
+        header h1 {
+            font-size: clamp(1.4rem, 4vw, 2.1rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+            font-size: 0.93rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem 3rem;
+        }
+
+        /* ── Stats bar ── */
+        .energy-card {
+            background: linear-gradient(135deg, var(--card), #1e2235);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 0.9rem 1.5rem;
+            margin: 1rem auto;
+            max-width: 820px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.8rem;
+            flex-wrap: wrap;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            margin-bottom: 0.15rem;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ── Slider controls ── */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.8rem;
+            margin: 1.2rem 0;
+        }
+
+        .slider-group {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 0.8rem 1.2rem;
+        }
+
+        .slider-group label {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-weight: 500;
+            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
+        }
+
+        .slider-val {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: var(--accent-blue);
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #2a2d42;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        input[type=range]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            border: none;
+        }
+
+        .lock-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            justify-content: center;
+            margin: 0.3rem 0 0.8rem;
+        }
+
+        .lock-row label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .lock-row input[type=checkbox] {
+            accent-color: var(--accent-purple);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        /* ── Plots grid ── */
+        .plots {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 900px) {
+            .plots {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .plot-card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 0.8rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plot-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+        }
+
+        .plot-card.wf::after {
+            background: linear-gradient(90deg, transparent, var(--accent-blue), transparent);
+        }
+
+        .plot-card.pd::after {
+            background: linear-gradient(90deg, transparent, var(--accent-red), transparent);
+        }
+
+        .plot-card.el::after {
+            background: linear-gradient(90deg, transparent, var(--accent-amber), transparent);
+        }
+
+        .plot-card h3 {
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 8px;
+        }
+
+        /* ── Degeneracy table ── */
+        .degen-section {
+            margin-top: 1.2rem;
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 1.2rem 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .degen-section h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-amber);
+            margin-bottom: 0.8rem;
+        }
+
+        #degen-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        #degen-table th {
+            text-align: left;
+            padding: 0.5rem 0.8rem;
+            border-bottom: 1px solid var(--card-border);
+            color: var(--text-dim);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        #degen-table td {
+            padding: 0.45rem 0.8rem;
+            border-bottom: 1px solid rgba(42, 45, 66, 0.5);
+            color: var(--text-muted);
+        }
+
+        #degen-table tr.highlight td {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .degen-badge {
+            display: inline-block;
+            padding: 0.15rem 0.55rem;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .degen-badge.degen {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
+
+        .degen-badge.unique {
+            background: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+        }
+
+        /* ── Info section ── */
+        .info-section {
+            margin-top: 1.5rem;
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 1.3rem 1.8rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .info-section h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-purple);
+            margin-bottom: 0.8rem;
+        }
+
+        .info-section p,
+        .info-section li {
+            color: var(--text-muted);
+            line-height: 1.7;
+            font-size: 0.9rem;
+        }
+
+        .info-section ul {
+            margin-left: 1.2rem;
+            margin-top: 0.4rem;
+        }
+
+        .info-section li {
+            margin-bottom: 0.25rem;
+        }
+
+        .formula-box {
+            background: rgba(139, 92, 246, 0.08);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 10px;
+            padding: 0.9rem 1.3rem;
+            margin: 0.8rem 0;
+            text-align: center;
+            font-size: 1rem;
+            color: var(--text);
+        }
+
+        /* ── Colorbar ── */
+        .colorbar-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.4rem;
+        }
+
+        .colorbar-label {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+        }
+
+        .colorbar-canvas {
+            border-radius: 4px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--text-dim);
+            font-size: 0.78rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>⚛️ 2D Particle in a Box — Degeneracy Explorer</h1>
+        <p>Explore wavefunctions, probability densities, and energy degeneracies in two dimensions</p>
+        <p style="margin-top:0.3rem; font-size:0.85rem; color:#64748b;">Developed by <strong
+                style="color:#a78bfa;">Saswata Dasgupta</strong></p>
+    </header>
+
+    <div class="container">
+
+        <!-- Stats -->
+        <div class="energy-card">
+            <div class="stat">
+                <div class="stat-label">$(n_x, n_y)$</div>
+                <div class="stat-value blue" id="stat-nxny" style="color:var(--accent-blue);">(1, 1)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">$(L_x, L_y)$</div>
+                <div class="stat-value" id="stat-LxLy" style="color:var(--accent-purple);">(1.0, 1.0)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Energy $E_{n_x,n_y}$</div>
+                <div class="stat-value" id="stat-E" style="color:var(--accent-red);">9.870</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Degeneracy</div>
+                <div class="stat-value" id="stat-deg" style="color:var(--accent-amber);">1</div>
+            </div>
+        </div>
+
+        <!-- Lock checkbox -->
+        <div class="lock-row">
+            <input type="checkbox" id="lock-L" checked>
+            <label for="lock-L">Lock $L_x = L_y$ (square box — enables degeneracy)</label>
+        </div>
+
+        <!-- Sliders -->
+        <div class="controls">
+            <div class="slider-group">
+                <label>$n_x$ <span class="slider-val" id="lbl-nx">1</span></label>
+                <input type="range" id="slider-nx" min="1" max="10" value="1" step="1">
+            </div>
+            <div class="slider-group">
+                <label>$n_y$ <span class="slider-val" id="lbl-ny">1</span></label>
+                <input type="range" id="slider-ny" min="1" max="10" value="1" step="1">
+            </div>
+            <div class="slider-group">
+                <label>$L_x$ <span class="slider-val" id="lbl-Lx">1.0</span></label>
+                <input type="range" id="slider-Lx" min="0.5" max="3.0" value="1.0" step="0.1">
+            </div>
+            <div class="slider-group">
+                <label>$L_y$ <span class="slider-val" id="lbl-Ly">1.0</span></label>
+                <input type="range" id="slider-Ly" min="0.5" max="3.0" value="1.0" step="0.1">
+            </div>
+        </div>
+
+        <!-- Plots -->
+        <div class="plots">
+            <div class="plot-card wf">
+                <h3>Wavefunction $\psi_{n_x,n_y}(x,y)$</h3>
+                <canvas id="canvas-psi" width="400" height="400"></canvas>
+                <div class="colorbar-wrap">
+                    <span class="colorbar-label">−</span>
+                    <canvas class="colorbar-canvas" id="cb-psi" width="200" height="12"></canvas>
+                    <span class="colorbar-label">+</span>
+                </div>
+            </div>
+            <div class="plot-card pd">
+                <h3>Probability $|\psi|^2$</h3>
+                <canvas id="canvas-prob" width="400" height="400"></canvas>
+                <div class="colorbar-wrap">
+                    <span class="colorbar-label">0</span>
+                    <canvas class="colorbar-canvas" id="cb-prob" width="200" height="12"></canvas>
+                    <span class="colorbar-label">max</span>
+                </div>
+            </div>
+            <div class="plot-card el">
+                <h3>Energy Level Diagram</h3>
+                <canvas id="canvas-energy" width="400" height="400"></canvas>
+            </div>
+        </div>
+
+        <!-- Degeneracy table -->
+        <div class="degen-section">
+            <h2>📊 Lowest Energy Levels & Degeneracies</h2>
+            <table id="degen-table">
+                <thead>
+                    <tr>
+                        <th>Energy $E$ (units $\pi^2\hbar^2/2m$)</th>
+                        <th>States $(n_x, n_y)$</th>
+                        <th>Degeneracy</th>
+                    </tr>
+                </thead>
+                <tbody id="degen-body"></tbody>
+            </table>
+        </div>
+
+        <!-- Educational -->
+        <div class="info-section">
+            <h2>📖 Key Equations</h2>
+            <div class="formula-box">
+                $$\psi_{n_x,n_y}(x,y) = \frac{2}{\sqrt{L_x L_y}}\sin\!\left(\frac{n_x\pi
+                x}{L_x}\right)\sin\!\left(\frac{n_y\pi y}{L_y}\right)$$
+            </div>
+            <div class="formula-box">
+                $$E_{n_x,n_y} = \frac{\pi^2\hbar^2}{2m}\left(\frac{n_x^2}{L_x^2} + \frac{n_y^2}{L_y^2}\right)$$
+            </div>
+
+            <h2 style="margin-top:1.2rem;">🔍 Explore Degeneracy</h2>
+            <ul>
+                <li><strong>Square box ($L_x = L_y$):</strong> States like $(1,2)$ and $(2,1)$ have the <em>same</em>
+                    energy but different wavefunctions. This is <strong>degeneracy</strong>!</li>
+                <li><strong>Breaking degeneracy:</strong> Uncheck the lock and make $L_x \neq L_y$. Watch degenerate
+                    pairs split into distinct energy levels.</li>
+                <li><strong>Accidental degeneracy:</strong> In a square box, do $(1,3)$ and $(3,1)$ have the same
+                    energy? What about $(1,4)$ vs $(2,2)$? Verify!</li>
+                <li><strong>Symmetry matters:</strong> Degeneracy arises from the symmetry of the potential. A square
+                    box has $C_{4v}$ symmetry; a rectangular box has lower symmetry, lifting the degeneracy.</li>
+                <li><strong>Pattern recognition:</strong> For a square box, which quantum numbers $n_x^2 + n_y^2$ give
+                    the same total? Count how many states share each energy.</li>
+            </ul>
+        </div>
+    </div>
+
+    <footer>2D Particle in a Box Simulation · Made for Quantum Mechanics</footer>
+
+    <script>
+        // ── Canvas references ──
+        const cPsi = document.getElementById('canvas-psi');
+        const cProb = document.getElementById('canvas-prob');
+        const cEn = document.getElementById('canvas-energy');
+        const ctxPsi = cPsi.getContext('2d');
+        const ctxProb = cProb.getContext('2d');
+        const ctxEn = cEn.getContext('2d');
+
+        const sNx = document.getElementById('slider-nx');
+        const sNy = document.getElementById('slider-ny');
+        const sLx = document.getElementById('slider-Lx');
+        const sLy = document.getElementById('slider-Ly');
+        const lockL = document.getElementById('lock-L');
+
+        // ── Hi-DPI ──
+        function setupHiDPI(canvas, ctx) {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+        }
+        function sz(canvas) {
+            const dpr = window.devicePixelRatio || 1;
+            return { w: canvas.width / dpr, h: canvas.height / dpr };
+        }
+
+        // ── Colormaps ──
+        function divergingColor(t) {
+            // t in [-1, 1] → blue-white-red
+            if (t < 0) {
+                const s = -t;
+                return [Math.round(255 * (1 - s)), Math.round(255 * (1 - s)), 255];
+            } else {
+                return [255, Math.round(255 * (1 - t)), Math.round(255 * (1 - t))];
+            }
+        }
+        function sequentialColor(t) {
+            // t in [0, 1] → dark purple → hot pink → yellow
+            const r = Math.round(Math.min(255, t * 400));
+            const g = Math.round(Math.max(0, (t - 0.4) * 425));
+            const b = Math.round(Math.max(0, 150 - t * 300));
+            return [r, g, b];
+        }
+        // Viridis-like sequential
+        function viridisColor(t) {
+            // Simplified viridis: dark purple → teal → yellow
+            const r = Math.round(68 + t * 187);
+            const g = Math.round(1 + t * (t < 0.5 ? 300 : 190 + t * 65));
+            const b = Math.round(84 + (t < 0.5 ? t * 270 : (1 - t) * 270));
+            return [
+                Math.min(255, Math.max(0, r)),
+                Math.min(255, Math.max(0, g)),
+                Math.min(255, Math.max(0, b))
+            ];
+        }
+        // Better "inferno"-like for probability
+        function infernoColor(t) {
+            // Black → purple → red → yellow
+            const r = Math.round(Math.min(255, t < 0.5 ? t * 2 * 200 : 200 + (t - 0.5) * 2 * 55));
+            const g = Math.round(Math.min(255, t < 0.35 ? 0 : (t - 0.35) / 0.65 * 255));
+            const b = Math.round(t < 0.3 ? t / 0.3 * 180 : 180 - (t - 0.3) / 0.7 * 180);
+            return [Math.max(0, r), Math.max(0, g), Math.max(0, b)];
+        }
+
+        // ── Draw colorbars ──
+        function drawColorbar(id, mapFn, symmetric) {
+            const cb = document.getElementById(id);
+            const ctx = cb.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = cb.getBoundingClientRect();
+            cb.width = rect.width * dpr;
+            cb.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            cb.style.width = rect.width + 'px';
+            cb.style.height = rect.height + 'px';
+
+            for (let i = 0; i < rect.width; i++) {
+                const t = symmetric ? (i / rect.width) * 2 - 1 : i / rect.width;
+                const [r, g, b] = mapFn(t);
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(i, 0, 1, rect.height);
+            }
+        }
+
+        // ── Physics ──
+        function energy(nx, ny, Lx, Ly) {
+            return (Math.PI * Math.PI / 2) * (nx * nx / (Lx * Lx) + ny * ny / (Ly * Ly));
+        }
+
+        // ── Draw 2D heatmap of wavefunction ──
+        function drawHeatmap(ctx, size, nx, ny, Lx, Ly, mode) {
+            const N = 150;
+            const imgData = ctx.createImageData(N, N);
+            const data = imgData.data;
+
+            const amp = 2 / Math.sqrt(Lx * Ly);
+            const maxVal = mode === 'psi' ? amp : amp * amp;
+
+            for (let j = 0; j < N; j++) {
+                const y = (j + 0.5) / N * Ly;
+                const sinY = Math.sin(ny * Math.PI * y / Ly);
+                for (let i = 0; i < N; i++) {
+                    const x = (i + 0.5) / N * Lx;
+                    const sinX = Math.sin(nx * Math.PI * x / Lx);
+                    let val = amp * sinX * sinY;
+
+                    let r, g, b;
+                    if (mode === 'psi') {
+                        const t = val / maxVal; // [-1, 1]
+                        [r, g, b] = divergingColor(t);
+                    } else {
+                        const probVal = val * val;
+                        const t = probVal / (maxVal * maxVal); // [0, 1]
+                        // but maxVal^2 = amp^2, let's normalize to actual max = amp^2
+                        const tNorm = probVal / (amp * amp);
+                        [r, g, b] = infernoColor(tNorm);
+                    }
+
+                    const idx = ((N - 1 - j) * N + i) * 4;
+                    data[idx] = r;
+                    data[idx + 1] = g;
+                    data[idx + 2] = b;
+                    data[idx + 3] = 255;
+                }
+            }
+
+            // Draw to a temp canvas then scale
+            const tmpCanvas = document.createElement('canvas');
+            tmpCanvas.width = N;
+            tmpCanvas.height = N;
+            tmpCanvas.getContext('2d').putImageData(imgData, 0, 0);
+
+            const margin = { top: 8, right: 8, bottom: 32, left: 36 };
+            const pw = size.w - margin.left - margin.right;
+            const ph = size.h - margin.top - margin.bottom;
+
+            // Background
+            ctx.fillStyle = '#12141f';
+            ctx.fillRect(margin.left, margin.top, pw, ph);
+
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(tmpCanvas, margin.left, margin.top, pw, ph);
+
+            // Axes
+            ctx.strokeStyle = '#4a4d62';
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(margin.left, margin.top, pw, ph);
+
+            // Axis labels
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '11px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('x', margin.left + pw / 2, margin.top + ph + 4);
+
+            // Tick values
+            ctx.fillText('0', margin.left, margin.top + ph + 4);
+            ctx.fillText(Lx.toFixed(1), margin.left + pw, margin.top + ph + 4);
+
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('0', margin.left - 4, margin.top + ph);
+            ctx.textBaseline = 'top';
+            ctx.fillText(Ly.toFixed(1), margin.left - 4, margin.top);
+
+            // Y label
+            ctx.save();
+            ctx.translate(10, margin.top + ph / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('y', 0, 0);
+            ctx.restore();
+
+            // Node lines (subtle guides)
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(margin.left, margin.top, pw, ph);
+            ctx.clip();
+            ctx.setLineDash([3, 3]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 0.8;
+            // Vertical nodes
+            for (let k = 1; k < nx; k++) {
+                const xPos = margin.left + (k / nx) * pw;
+                ctx.beginPath(); ctx.moveTo(xPos, margin.top); ctx.lineTo(xPos, margin.top + ph); ctx.stroke();
+            }
+            // Horizontal nodes
+            for (let k = 1; k < ny; k++) {
+                const yPos = margin.top + ph - (k / ny) * ph;
+                ctx.beginPath(); ctx.moveTo(margin.left, yPos); ctx.lineTo(margin.left + pw, yPos); ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+
+        // ── Energy level diagram ──
+        function drawEnergyDiagram(ctx, size, nx, ny, Lx, Ly) {
+            ctx.clearRect(0, 0, size.w, size.h);
+
+            const margin = { top: 16, right: 16, bottom: 30, left: 48 };
+            const pw = size.w - margin.left - margin.right;
+            const ph = size.h - margin.top - margin.bottom;
+
+            // Collect energy levels
+            const levels = new Map();
+            const maxN = 7;
+            for (let a = 1; a <= maxN; a++) {
+                for (let b = 1; b <= maxN; b++) {
+                    const E = energy(a, b, Lx, Ly);
+                    const key = E.toFixed(4);
+                    if (!levels.has(key)) levels.set(key, { E, states: [] });
+                    levels.get(key).states.push(`(${a},${b})`);
+                }
+            }
+
+            // Sort and take lowest 12
+            const sorted = [...levels.values()].sort((a, b) => a.E - b.E).slice(0, 12);
+            const Emin = sorted[0].E;
+            const Emax = sorted[sorted.length - 1].E;
+            const Erange = Emax - Emin || 1;
+
+            // Current state energy
+            const Ecur = energy(nx, ny, Lx, Ly);
+
+            // Draw
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px Inter, system-ui, sans-serif';
+
+            // Y-axis label
+            ctx.save();
+            ctx.translate(12, margin.top + ph / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText('Energy', 0, 0);
+            ctx.restore();
+
+            sorted.forEach((lvl, i) => {
+                const yFrac = (lvl.E - Emin) / Erange;
+                const y = margin.top + ph - yFrac * (ph - 10);
+                const isSelected = Math.abs(lvl.E - Ecur) < 0.001;
+                const isDegen = lvl.states.length > 1;
+
+                // Line
+                ctx.beginPath();
+                ctx.moveTo(margin.left, y);
+                ctx.lineTo(margin.left + pw * 0.55, y);
+                ctx.strokeStyle = isSelected ? '#3b82f6' : (isDegen ? '#fbbf24' : '#4a4d62');
+                ctx.lineWidth = isSelected ? 3 : 1.8;
+                ctx.stroke();
+
+                // Glow for selected
+                if (isSelected) {
+                    ctx.beginPath();
+                    ctx.moveTo(margin.left, y);
+                    ctx.lineTo(margin.left + pw * 0.55, y);
+                    ctx.strokeStyle = 'rgba(59,130,246,0.3)';
+                    ctx.lineWidth = 8;
+                    ctx.stroke();
+                }
+
+                // Energy value
+                ctx.fillStyle = isSelected ? '#60a5fa' : '#94a3b8';
+                ctx.font = isSelected ? 'bold 10px Inter, system-ui, sans-serif' : '10px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(lvl.E.toFixed(2), margin.left + pw * 0.58, y);
+
+                // States
+                ctx.fillStyle = isDegen ? '#fbbf24' : '#64748b';
+                ctx.font = '9px Inter, system-ui, sans-serif';
+                const stateStr = lvl.states.join(' ');
+                // truncate if too long
+                const maxLen = 20;
+                const display = stateStr.length > maxLen ? stateStr.slice(0, maxLen) + '…' : stateStr;
+                ctx.fillText(display, margin.left + pw * 0.58 + 42, y);
+
+                // Degeneracy badge
+                if (isDegen) {
+                    const bx = margin.left - 2;
+                    ctx.fillStyle = 'rgba(245,158,11,0.15)';
+                    roundRect(ctx, bx - 12, y - 8, 18, 16, 4);
+                    ctx.fill();
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = 'bold 10px Inter, system-ui, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(lvl.states.length, bx - 3, y);
+                }
+            });
+
+            // Arrow showing current level
+            ctx.fillStyle = '#3b82f6';
+            ctx.font = '10px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'right';
+            const yC = margin.top + ph - ((Ecur - Emin) / Erange) * (ph - 10);
+            ctx.fillText('▸', margin.left - 16, yC);
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        // ── Degeneracy table ──
+        function updateDegenTable(Lx, Ly, curNx, curNy) {
+            const levels = new Map();
+            const maxN = 8;
+            for (let a = 1; a <= maxN; a++) {
+                for (let b = 1; b <= maxN; b++) {
+                    const E = energy(a, b, Lx, Ly);
+                    const key = E.toFixed(4);
+                    if (!levels.has(key)) levels.set(key, { E, states: [] });
+                    levels.get(key).states.push([a, b]);
+                }
+            }
+
+            const sorted = [...levels.values()].sort((a, b) => a.E - b.E).slice(0, 10);
+            const curE = energy(curNx, curNy, Lx, Ly);
+
+            const tbody = document.getElementById('degen-body');
+            tbody.innerHTML = '';
+            sorted.forEach(lvl => {
+                const tr = document.createElement('tr');
+                if (Math.abs(lvl.E - curE) < 0.001) tr.classList.add('highlight');
+
+                const eRed = lvl.E / (Math.PI * Math.PI / 2); // in units of pi^2 hbar^2 / 2m
+                const tdE = document.createElement('td');
+                tdE.textContent = eRed.toFixed(3);
+                if (Math.abs(eRed - Math.round(eRed)) < 0.001) {
+                    tdE.innerHTML = `<strong>${Math.round(eRed)}</strong>`;
+                } else {
+                    tdE.textContent = eRed.toFixed(3);
+                }
+
+                const tdS = document.createElement('td');
+                tdS.textContent = lvl.states.map(s => `(${s[0]},${s[1]})`).join(',  ');
+
+                const tdD = document.createElement('td');
+                const badge = document.createElement('span');
+                badge.classList.add('degen-badge');
+                if (lvl.states.length > 1) {
+                    badge.classList.add('degen');
+                    badge.textContent = `${lvl.states.length}-fold`;
+                } else {
+                    badge.classList.add('unique');
+                    badge.textContent = 'non-degenerate';
+                }
+                tdD.appendChild(badge);
+
+                tr.appendChild(tdE);
+                tr.appendChild(tdS);
+                tr.appendChild(tdD);
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ── Main draw ──
+        function draw() {
+            const nx = parseInt(sNx.value);
+            const ny = parseInt(sNy.value);
+            let Lx = parseFloat(sLx.value);
+            let Ly = parseFloat(sLy.value);
+
+            if (lockL.checked) {
+                Ly = Lx;
+                sLy.value = Lx;
+                document.getElementById('lbl-Ly').textContent = Lx.toFixed(1);
+            }
+
+            const E = energy(nx, ny, Lx, Ly);
+
+            // Update labels
+            document.getElementById('lbl-nx').textContent = nx;
+            document.getElementById('lbl-ny').textContent = ny;
+            document.getElementById('lbl-Lx').textContent = Lx.toFixed(1);
+            document.getElementById('lbl-Ly').textContent = Ly.toFixed(1);
+            document.getElementById('stat-nxny').textContent = `(${nx}, ${ny})`;
+            document.getElementById('stat-LxLy').textContent = `(${Lx.toFixed(1)}, ${Ly.toFixed(1)})`;
+            document.getElementById('stat-E').textContent = E.toFixed(3);
+
+            // Compute degeneracy of current level
+            let deg = 0;
+            for (let a = 1; a <= 12; a++) {
+                for (let b = 1; b <= 12; b++) {
+                    if (Math.abs(energy(a, b, Lx, Ly) - E) < 0.001) deg++;
+                }
+            }
+            document.getElementById('stat-deg').textContent = deg > 1 ? `${deg}-fold` : '1 (unique)';
+
+            // Draw heatmaps
+            const sPsi = sz(cPsi);
+            ctxPsi.clearRect(0, 0, sPsi.w, sPsi.h);
+            drawHeatmap(ctxPsi, sPsi, nx, ny, Lx, Ly, 'psi');
+
+            const sProb = sz(cProb);
+            ctxProb.clearRect(0, 0, sProb.w, sProb.h);
+            drawHeatmap(ctxProb, sProb, nx, ny, Lx, Ly, 'prob');
+
+            // Energy diagram
+            const sEn = sz(cEn);
+            drawEnergyDiagram(ctxEn, sEn, nx, ny, Lx, Ly);
+
+            // Table
+            updateDegenTable(Lx, Ly, nx, ny);
+        }
+
+        // ── Events ──
+        sNx.addEventListener('input', draw);
+        sNy.addEventListener('input', draw);
+        sLx.addEventListener('input', () => { if (lockL.checked) { sLy.value = sLx.value; } draw(); });
+        sLy.addEventListener('input', () => { if (lockL.checked) { sLx.value = sLy.value; } draw(); });
+        lockL.addEventListener('change', () => { if (lockL.checked) { sLy.value = sLx.value; } draw(); });
+
+        function init() {
+            setupHiDPI(cPsi, ctxPsi);
+            setupHiDPI(cProb, ctxProb);
+            setupHiDPI(cEn, ctxEn);
+            drawColorbar('cb-psi', divergingColor, true);
+            drawColorbar('cb-prob', infernoColor, false);
+            draw();
+        }
+
+        window.addEventListener('resize', init);
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>
