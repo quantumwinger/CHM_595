@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Particle in a Box — Interactive Quantum Mechanics</title>
+  <meta name="description"
+    content="Interactive quantum mechanics simulation: visualize particle-in-a-box wavefunctions and probability densities.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=KaTeX_Main&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card: #1a1d2e;
+      --card-border: #2a2d42;
+      --accent-blue: #3b82f6;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --glow-blue: rgba(59, 130, 246, 0.15);
+      --glow-red: rgba(239, 68, 68, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at 30% 20%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+      animation: drift 20s ease-in-out infinite alternate;
+      z-index: -1;
+    }
+
+    @keyframes drift {
+      0% {
+        transform: translate(0, 0) rotate(0deg);
+      }
+
+      100% {
+        transform: translate(-3%, 2%) rotate(3deg);
+      }
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 2.5rem 1rem 1rem;
+    }
+
+    header h1 {
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      color: var(--text-muted);
+      margin-top: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1rem 3rem;
+    }
+
+    /* ── Energy card ── */
+    .energy-card {
+      background: linear-gradient(135deg, var(--card), #1e2235);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1rem 1.5rem;
+      margin: 1.2rem auto;
+      max-width: 620px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .energy-card .stat {
+      text-align: center;
+    }
+
+    .energy-card .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 0.2rem;
+    }
+
+    .energy-card .stat-value {
+      font-size: 1.35rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .energy-card .stat-value.blue {
+      color: var(--accent-blue);
+    }
+
+    .energy-card .stat-value.red {
+      color: var(--accent-red);
+    }
+
+    .energy-card .stat-value.purple {
+      color: var(--accent-purple);
+    }
+
+    /* ── Slider controls ── */
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin: 1.5rem 0;
+    }
+
+    .slider-group {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      min-width: 260px;
+      flex: 1;
+      max-width: 360px;
+    }
+
+    .slider-group label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-weight: 500;
+      margin-bottom: 0.6rem;
+      font-size: 0.9rem;
+    }
+
+    .slider-group .slider-val {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--accent-blue);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #2a2d42;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+      transition: box-shadow 0.2s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 18px rgba(59, 130, 246, 0.7);
+    }
+
+    input[type=range]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      border: none;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    }
+
+    /* ── Canvas plots ── */
+    .plots {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      margin-top: 1.2rem;
+    }
+
+    @media (max-width: 700px) {
+      .plots {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .plot-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .plot-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+    }
+
+    .plot-card.wf::after {
+      background: linear-gradient(90deg, transparent, var(--accent-blue), transparent);
+    }
+
+    .plot-card.pd::after {
+      background: linear-gradient(90deg, transparent, var(--accent-red), transparent);
+    }
+
+    .plot-card h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+      text-align: center;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+    }
+
+    /* ── Info section ── */
+    .info-section {
+      margin-top: 2rem;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.5rem 2rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .info-section h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent-purple);
+      margin-bottom: 1rem;
+    }
+
+    .info-section p,
+    .info-section li {
+      color: var(--text-muted);
+      line-height: 1.7;
+      font-size: 0.92rem;
+    }
+
+    .info-section ul {
+      margin-left: 1.2rem;
+      margin-top: 0.5rem;
+    }
+
+    .info-section li {
+      margin-bottom: 0.3rem;
+    }
+
+    .formula-box {
+      background: rgba(139, 92, 246, 0.08);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      border-radius: 10px;
+      padding: 1rem 1.5rem;
+      margin: 1rem 0;
+      text-align: center;
+      font-size: 1.05rem;
+      color: var(--text);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>⚛️ Particle in a Box</h1>
+    <p>Interactive quantum mechanics simulation — adjust the sliders and explore!</p>
+    <p style="margin-top:0.3rem; font-size:0.85rem; color:#64748b;">Developed by <strong style="color:#a78bfa;">Saswata
+        Dasgupta</strong></p>
+  </header>
+
+  <div class="container">
+
+    <!-- Energy readout -->
+    <div class="energy-card">
+      <div class="stat">
+        <div class="stat-label">Quantum Number</div>
+        <div class="stat-value blue" id="stat-n">1</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Box Length</div>
+        <div class="stat-value purple" id="stat-L">1.0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Energy $E_n$</div>
+        <div class="stat-value red" id="stat-E">4.935</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Nodes</div>
+        <div class="stat-value" id="stat-nodes" style="color:#34d399;">0</div>
+      </div>
+    </div>
+
+    <!-- Sliders -->
+    <div class="controls">
+      <div class="slider-group">
+        <label>Quantum number $n$ <span class="slider-val" id="lbl-n">1</span></label>
+        <input type="range" id="slider-n" min="1" max="20" value="1" step="1">
+      </div>
+      <div class="slider-group">
+        <label>Box length $L$ <span class="slider-val" id="lbl-L">1.0</span></label>
+        <input type="range" id="slider-L" min="0.5" max="5.0" value="1.0" step="0.1">
+      </div>
+    </div>
+
+    <!-- Plots -->
+    <div class="plots">
+      <div class="plot-card wf">
+        <h3>Wavefunction $\psi_n(x)$</h3>
+        <canvas id="canvas-psi" width="600" height="400"></canvas>
+      </div>
+      <div class="plot-card pd">
+        <h3>Probability Density $|\psi_n(x)|^2$</h3>
+        <canvas id="canvas-prob" width="600" height="400"></canvas>
+      </div>
+    </div>
+
+    <!-- Educational content -->
+    <div class="info-section">
+      <h2>📖 Key Equations</h2>
+      <div class="formula-box">
+        $$\psi_n(x) = \sqrt{\frac{2}{L}}\,\sin\!\left(\frac{n\pi x}{L}\right), \qquad E_n =
+        \frac{n^2\pi^2\hbar^2}{2mL^2}$$
+      </div>
+      <h2 style="margin-top:1.2rem;">🔍 Things to Explore</h2>
+      <ul>
+        <li><strong>Nodes:</strong> How many zero-crossings does $\psi_n(x)$ have inside the box? Can you find a
+          formula?</li>
+        <li><strong>Most probable position:</strong> For $n=1$, where is the particle most likely found? What about
+          $n=2$?</li>
+        <li><strong>Classical limit:</strong> Increase $n$ to 15–20. The probability density starts resembling the
+          classical prediction (the dashed line at $1/L$). This is the <em>correspondence principle</em>!</li>
+        <li><strong>Box length:</strong> Fix $n=1$, increase $L$. The wavefunction amplitude drops and the energy
+          decreases. Why?</li>
+        <li><strong>Energy scaling:</strong> $E_n$ grows as $n^2$ and shrinks as $1/L^2$. A smaller box means higher
+          energy — the uncertainty principle at work!</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>Particle in a Box Simulation · Made for Quantum Mechanics</footer>
+
+  <script>
+    // ── Plotting engine ──
+    const cPsi = document.getElementById('canvas-psi');
+    const cProb = document.getElementById('canvas-prob');
+    const ctxPsi = cPsi.getContext('2d');
+    const ctxProb = cProb.getContext('2d');
+
+    const sliderN = document.getElementById('slider-n');
+    const sliderL = document.getElementById('slider-L');
+    const lblN = document.getElementById('lbl-n');
+    const lblL = document.getElementById('lbl-L');
+    const statN = document.getElementById('stat-n');
+    const statL = document.getElementById('stat-L');
+    const statE = document.getElementById('stat-E');
+    const statNodes = document.getElementById('stat-nodes');
+
+    // High-DPI canvas
+    function setupHiDPI(canvas, ctx) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+    }
+
+    function getCanvasSize(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      return { w: canvas.width / dpr, h: canvas.height / dpr };
+    }
+
+    // Margins for axes
+    const margin = { top: 18, right: 20, bottom: 42, left: 52 };
+
+    function drawAxes(ctx, size, xLabel, yLabel, xMin, xMax, yMin, yMax, color) {
+      const plotW = size.w - margin.left - margin.right;
+      const plotH = size.h - margin.top - margin.bottom;
+
+      ctx.save();
+      ctx.strokeStyle = '#3a3d52';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '12px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+
+      // x-axis ticks
+      const xTicks = niceScale(xMin, xMax, 6);
+      xTicks.forEach(v => {
+        const px = margin.left + (v - xMin) / (xMax - xMin) * plotW;
+        // Grid line
+        ctx.beginPath();
+        ctx.moveTo(px, margin.top);
+        ctx.lineTo(px, margin.top + plotH);
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.stroke();
+        // Tick label
+        ctx.fillText(v.toFixed(1), px, margin.top + plotH + 6);
+      });
+      // x label
+      ctx.font = '13px Inter, system-ui, sans-serif';
+      ctx.fillText(xLabel, margin.left + plotW / 2, size.h - 8);
+
+      // y-axis ticks
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.font = '12px Inter, system-ui, sans-serif';
+      const yTicks = niceScale(yMin, yMax, 5);
+      yTicks.forEach(v => {
+        const py = margin.top + plotH - (v - yMin) / (yMax - yMin) * plotH;
+        ctx.beginPath();
+        ctx.moveTo(margin.left, py);
+        ctx.lineTo(margin.left + plotW, py);
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.stroke();
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(v.toFixed(2), margin.left - 6, py);
+      });
+      // y label
+      ctx.save();
+      ctx.translate(14, margin.top + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.font = '13px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(yLabel, 0, 0);
+      ctx.restore();
+
+      // Axes frame
+      ctx.strokeStyle = '#4a4d62';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.rect(margin.left, margin.top, plotW, plotH);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function niceScale(min, max, targetTicks) {
+      const range = max - min;
+      if (range <= 0) return [min];
+      const rough = range / targetTicks;
+      const pow10 = Math.pow(10, Math.floor(Math.log10(rough)));
+      let step;
+      const f = rough / pow10;
+      if (f < 1.5) step = pow10;
+      else if (f < 3.5) step = 2 * pow10;
+      else if (f < 7.5) step = 5 * pow10;
+      else step = 10 * pow10;
+
+      const ticks = [];
+      let v = Math.ceil(min / step) * step;
+      while (v <= max + step * 0.01) {
+        ticks.push(v);
+        v += step;
+      }
+      return ticks;
+    }
+
+    function plotCurve(ctx, size, xData, yData, xMin, xMax, yMin, yMax, color, fillColor) {
+      const plotW = size.w - margin.left - margin.right;
+      const plotH = size.h - margin.top - margin.bottom;
+
+      const toX = v => margin.left + (v - xMin) / (xMax - xMin) * plotW;
+      const toY = v => margin.top + plotH - (v - yMin) / (yMax - yMin) * plotH;
+
+      // Clip to plot area
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(margin.left, margin.top, plotW, plotH);
+      ctx.clip();
+
+      // Fill
+      if (fillColor) {
+        ctx.beginPath();
+        ctx.moveTo(toX(xData[0]), toY(0));
+        for (let i = 0; i < xData.length; i++) ctx.lineTo(toX(xData[i]), toY(yData[i]));
+        ctx.lineTo(toX(xData[xData.length - 1]), toY(0));
+        ctx.closePath();
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+      }
+
+      // Stroke
+      ctx.beginPath();
+      ctx.moveTo(toX(xData[0]), toY(yData[0]));
+      for (let i = 1; i < xData.length; i++) ctx.lineTo(toX(xData[i]), toY(yData[i]));
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawDashedHLine(ctx, size, y, xMin, xMax, yMin, yMax, color) {
+      const plotW = size.w - margin.left - margin.right;
+      const plotH = size.h - margin.top - margin.bottom;
+      const py = margin.top + plotH - (y - yMin) / (yMax - yMin) * plotH;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(margin.left, margin.top, plotW, plotH);
+      ctx.clip();
+
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, py);
+      ctx.lineTo(margin.left + plotW, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Label
+      ctx.fillStyle = color;
+      ctx.font = '11px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('1/L (classical)', margin.left + 4, py - 4);
+
+      ctx.restore();
+    }
+
+    function drawZeroLine(ctx, size, xMin, xMax, yMin, yMax) {
+      if (yMin >= 0) return;
+      const plotW = size.w - margin.left - margin.right;
+      const plotH = size.h - margin.top - margin.bottom;
+      const py = margin.top + plotH - (0 - yMin) / (yMax - yMin) * plotH;
+
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, py);
+      ctx.lineTo(margin.left + plotW, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // ── Physics ──
+    function psi(x, n, L) {
+      return Math.sqrt(2 / L) * Math.sin(n * Math.PI * x / L);
+    }
+    function energy(n, L) {
+      return (n * n * Math.PI * Math.PI) / (2 * L * L);  // hbar=m=1
+    }
+
+    // ── Main draw ──
+    function draw() {
+      const n = parseInt(sliderN.value);
+      const L = parseFloat(sliderL.value);
+      const E = energy(n, L);
+
+      // Update readouts
+      lblN.textContent = n;
+      lblL.textContent = L.toFixed(1);
+      statN.textContent = n;
+      statL.textContent = L.toFixed(1);
+      statE.textContent = E.toFixed(3);
+      statNodes.textContent = n - 1;
+
+      // Generate data
+      const N = 600;
+      const x = [], yPsi = [], yProb = [];
+      for (let i = 0; i <= N; i++) {
+        const xi = (i / N) * L;
+        x.push(xi);
+        const p = psi(xi, n, L);
+        yPsi.push(p);
+        yProb.push(p * p);
+      }
+
+      const amp = Math.sqrt(2 / L);
+      const yMaxPsi = amp * 1.15;
+      const yMaxProb = (2 / L) * 1.15;
+
+      // ── Draw wavefunction ──
+      const sPsi = getCanvasSize(cPsi);
+      ctxPsi.clearRect(0, 0, sPsi.w, sPsi.h);
+      drawAxes(ctxPsi, sPsi, 'x', 'ψₙ(x)', 0, L, -yMaxPsi, yMaxPsi, '#3b82f6');
+      drawZeroLine(ctxPsi, sPsi, 0, L, -yMaxPsi, yMaxPsi);
+      plotCurve(ctxPsi, sPsi, x, yPsi, 0, L, -yMaxPsi, yMaxPsi, '#3b82f6', 'rgba(59,130,246,0.12)');
+
+      // ── Draw probability ──
+      const sProb = getCanvasSize(cProb);
+      ctxProb.clearRect(0, 0, sProb.w, sProb.h);
+      drawAxes(ctxProb, sProb, 'x', '|ψₙ(x)|²', 0, L, 0, yMaxProb, '#ef4444');
+      drawDashedHLine(ctxProb, sProb, 1 / L, 0, L, 0, yMaxProb, 'rgba(148,163,184,0.6)');
+      plotCurve(ctxProb, sProb, x, yProb, 0, L, 0, yMaxProb, '#ef4444', 'rgba(239,68,68,0.10)');
+    }
+
+    // ── Init ──
+    function init() {
+      setupHiDPI(cPsi, ctxPsi);
+      setupHiDPI(cProb, ctxProb);
+      draw();
+    }
+
+    sliderN.addEventListener('input', draw);
+    sliderL.addEventListener('input', draw);
+    window.addEventListener('resize', () => {
+      setupHiDPI(cPsi, ctxPsi);
+      setupHiDPI(cProb, ctxProb);
+      draw();
+    });
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>
